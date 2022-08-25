@@ -7,6 +7,9 @@ import pickle
 import gzip
 import pandas as pd
 
+import os
+os.chdir("NeuralNetwork")
+
 
 def msecost(yhat,y):
     return (y-yhat)**2
@@ -14,11 +17,17 @@ def msecost(yhat,y):
 def msecostprime(yhat,y):
     return (yhat-y)*2
 
+def cecost(y,yhat):
+    return -( y*np.log(yhat) + (1-y)*np.log(1-yhat) )
+
+def cecostprime(yhat,y):
+    return -( (y/yhat) - ((1-y)/(1-yhat)) )
+
 def sigmoid(a):
     return 1./(1.+np.exp(-a))
 
 def sigmoid_prime(a):
-    return sigmoid(a)*sigmoid(1.-a)
+    return sigmoid(a)*(1.-sigmoid(a))
 
 class Network:
     def __init__(self,in_dim,hidden_dim,out_dim):
@@ -59,11 +68,10 @@ class Network:
         self.gradB = [np.zeros(self.biases[0].shape),np.zeros(self.biases[1].shape)]
         self.feedforward(input) #retrieve activations
         yhat = self.result
-        C = msecost(yhat,label)
         #compute out layer error
         #print("errors before : ",[elt.shape for elt in self.errors])
         self.errors[-1] = np.vectorize(sigmoid_prime)(self.linact[-1])   #derivative of activation function
-        self.errors[-1] = self.errors[-1] * np.vectorize(msecostprime)(yhat,label) #by the derivative of cost fun
+        self.errors[-1] = self.errors[-1] * np.vectorize(cecostprime)(yhat,label) #by the derivative of cost fun
         #print("errors after : ",[elt.shape for elt in self.errors])
         #compute error for every active neuron
         for i in np.arange(len(self.errors)-2,-1,-1):
@@ -125,4 +133,4 @@ y_test = [[0]*(elt)+[1]+[0]*(9-elt) for elt in y_test]
 #fun = np.vectorize(lambda x:(np.cos(x)+2)/4.)
 #Y_cos = fun(X_cos)
 
-nn.learn(X_train,y_train,0.3,100,512,X_test,y_test)
+nn.learn(X_train,y_train,0.15,100,512,X_test,y_test)
