@@ -29,6 +29,12 @@ def sigmoid(a):
 def sigmoid_prime(a):
     return sigmoid(a)*(1.-sigmoid(a))
 
+def ReLU(a):
+    return 0 if a<0 else a
+
+def ReLU_prime(a):
+    return 1 if a>0 else 0
+
 class Network:
     def __init__(self,in_dim,hidden_dim,out_dim):
         self.weights = []
@@ -53,7 +59,10 @@ class Network:
                 self.result = np.matmul(w,self.result)
                 self.result = self.result + b
                 self.linact.append(self.result)
-                self.result = np.vectorize(sigmoid)(self.result)
+                if i<len(self.weights)-1:           #apply relu unless last layer, then sigmoid
+                    self.result = np.vectorize(ReLU)(self.result)
+                else:
+                    self.result = np.vectorize(sigmoid)(self.result)
                 
     def predict(self,input):
         self.feedforward(input)
@@ -74,7 +83,7 @@ class Network:
         #compute error for every active neuron
         for i in np.arange(len(self.errors)-2,-1,-1):
             self.errors[i] = self.errors[i] + np.matmul(self.weights[i+1].T,self.errors[i+1])
-            self.errors[i] = self.errors[i] * np.vectorize(sigmoid_prime)(self.linact[i+1])
+            self.errors[i] = self.errors[i] * np.vectorize(ReLU_prime)(self.linact[i+1])
         #compute the gradient
         self.gradB = self.errors
         for i in range(len(self.gradw)):
@@ -117,7 +126,7 @@ class Network:
                 self.update_minibatch(minibatch,lr,weight_decay)
                 print("minibatch",i )
                 if i%10==0:
-                    print(self.weights[0].mean(axis=None))
+                    print(self.weights[0].max(axis=None))
                     print("test accuracy : ",self.test(testX,testY))
                     print("train accuracy : ",self.test(dataX[:5000],dataY[:5000]))
 
@@ -136,4 +145,4 @@ y_test = [[0]*(elt)+[1]+[0]*(9-elt) for elt in y_test]
 #fun = np.vectorize(lambda x:(np.cos(x)+2)/4.)
 #Y_cos = fun(X_cos)
 
-nn.learn(X_train,y_train,0.15,100,512,X_test,y_test,5000)
+nn.learn(X_train,y_train,0.15,100,128,X_test,y_test,None)
