@@ -36,7 +36,7 @@ def ReLU_prime(a):
     return 1 if a>0 else 0
 
 class Network:
-    def __init__(self,in_dim,hidden_dim,out_dim):
+    def __init__(self,in_dim,hidden_dim,out_dim,momentum=None):
         self.weights = []
         self.weights.append(np.reshape(0.25*np.random.randn((hidden_dim*in_dim)),(hidden_dim,in_dim)))   #matrix of hidden*in weights
         self.weights.append(np.reshape(0.25*np.random.randn((out_dim*hidden_dim)),(out_dim,hidden_dim)))  #matrix of hidden*out weights
@@ -45,6 +45,8 @@ class Network:
         self.biases.append(np.reshape(0.25*np.random.randn((out_dim)),(out_dim,)))   #vector of hidden_dim biases
         self.gradw = None
         self.gradB = None
+        self.momentumGrad = [np.zeros(self.weights[0].shape),np.zeros(self.weights[1].shape)] if momentum else None
+        self.momentum = momentum
 
     def feedforward(self,input):
         #this isn't production code so I'm storing linear activations for every step
@@ -109,12 +111,16 @@ class Network:
         #average it
         deltab = [elt/len(list(data)) for elt in deltab]
         deltaw = [elt/len(list(data)) for elt in deltaw]
+        if self.momentumGrad != None:       #if momentum, compute the time-average value
+            for i in range(len(deltaw)):
+                self.momentumGrad[i] = (1-self.momentum) * deltaw[i] + self.momentum * self.momentumGrad[i]
+        condgrad = deltaw if self.momentum==None else self.momentumGrad #use either normal gradient or momentum gradient
         #update the weights
         self.biases = [elt - lr * delta for (delta,elt) in zip(deltab,self.biases)]
         if weight_decay != None:
-            self.weights = [(1 - (lr*weight_decay)/elt.size) * elt - lr * delta for (delta,elt) in zip(deltaw,self.weights)]
+            self.weights = [(1 - (lr*weight_decay)/elt.size) * elt - lr * delta for (delta,elt) in zip(condgrad,self.weights)]
         else:
-            self.weights = [elt - lr * delta for (delta,elt) in zip(deltaw,self.weights)]
+            self.weights = [elt - lr * delta for (delta,elt) in zip(condgrad,self.weights)]
 
 
     def learn(self,dataX,dataY,lr,epochs,batch_size,testX,testY,weight_decay):
@@ -124,13 +130,13 @@ class Network:
         for i in tqdm.trange(epochs):
             for minibatch,i in zip(minibatches,range(len(minibatches))):
                 self.update_minibatch(minibatch,lr,weight_decay)
-                print("minibatch",i )
                 if i%10==0:
-                    print(self.weights[0].max(axis=None))
-                    print("test accuracy : ",self.test(testX,testY))
-                    print("train accuracy : ",self.test(dataX[:5000],dataY[:5000]))
+                    print("minibatch",i )
+            print(self.weights[0].max(axis=None))
+            print("test accuracy : ",self.test(testX,testY))
+            print("train accuracy : ",self.test(dataX[:5000],dataY[:5000]))
 
-nn = Network(784,100,10)
+nn = Network(784,100,10,None)#last param indicates momentum
 
 
 with gzip.open("mnist.pkl.gz","rb") as file:
@@ -145,4 +151,4 @@ y_test = [[0]*(elt)+[1]+[0]*(9-elt) for elt in y_test]
 #fun = np.vectorize(lambda x:(np.cos(x)+2)/4.)
 #Y_cos = fun(X_cos)
 
-nn.learn(X_train,y_train,0.15,100,128,X_test,y_test,None)
+nn.learn(X_train,y_train,0.15,30,128,X_test,y_test,0.5)
